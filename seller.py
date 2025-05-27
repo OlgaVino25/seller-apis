@@ -25,8 +25,8 @@ def get_product_list(last_id, client_id, seller_token):
         Словарь с результатом или None прри ошибке.
     
     Raises:
-        requests.HTTPError: Если сервер вернул код статуса HTTP >= 400.
-        
+        requests.HTTPError: В случае ошибки HTTP-запроса
+    
     Examples:
         Некорректный API-ключ:
             >>> get_product_list("", "valid_client", "invalid_token")
@@ -89,7 +89,7 @@ def update_price(prices: list, client_id, seller_token):
         dict: Ответ API Ozon в формате JSON.
     
     Raises:
-        requests.HTTPError: Если сервер вернул код статуса HTTP >= 400.
+        requests.HTTPError: В случае ошибки HTTP-запроса
     """
     url = "https://api-seller.ozon.ru/v1/product/import/prices"
     headers = {
@@ -111,7 +111,7 @@ def update_stocks(stocks: list, client_id, seller_token):
         dict: Ответ API Ozon в формате JSON.
     
     Raises:
-        requests.HTTPError: Если сервер вернул код статуса HTTP >= 400.
+        requests.HTTPError: В случае ошибки HTTP-запроса
     """
     url = "https://api-seller.ozon.ru/v1/product/import/stocks"
     headers = {
@@ -136,7 +136,7 @@ def download_stock():
         list[dict]: Список словарей с информацией о часах.
     
     Raises:
-        requests.HTTPError: Если сервер вернул код статуса HTTP >= 400.
+        requests.HTTPError: В случае ошибки HTTP-запроса
     """
     # Скачать остатки с сайта
     casio_url = "https://timeworld.ru/upload/files/ostatki.zip"
