@@ -11,6 +11,23 @@ logger = logging.getLogger(__file__)
 
 
 def get_product_list(page, campaign_id, access_token):
+    """Получает пагинированный список товаров через Яндекс.Маркет Seller API.
+
+    Делает GET-запрос к API Яндекс.Маркета для получения списка товаров с пагинацией.
+    200 товаров на странице.
+    В случае ошибки HTTP поднимает исключение requests.HTTPError.
+
+    Args:
+        page (str): Идентификатор последнего полученного товара.
+        campaign_id (str): Идентификатор кампании продавца в Яндекс.Маркете.
+        access_token (str): API-ключ продавца.
+    
+    Returns:
+        Словарь с результатом или None прри ошибке.
+    
+    Raises:
+        requests.HTTPError: В случае ошибки HTTP-запроса
+    """
     endpoint_url = "https://api.partner.market.yandex.ru/"
     headers = {
         "Content-Type": "application/json",
@@ -30,6 +47,19 @@ def get_product_list(page, campaign_id, access_token):
 
 
 def update_stocks(stocks, campaign_id, access_token):
+    """Обновляет остатки товаров на Яндекс.Маркете.
+
+    Args:
+        stocks (list[dict]): Список словарей с данными об остатках товаров.
+        campaign_id (str): Идентификатор кампании продавца в Яндекс.Маркете.
+        access_token (str): API-ключ продавца.
+
+    Returns:
+        dict: Ответ API в формате JSON
+
+    Raises:
+        requests.HTTPError: В случае ошибки HTTP-запроса
+    """
     endpoint_url = "https://api.partner.market.yandex.ru/"
     headers = {
         "Content-Type": "application/json",
@@ -46,6 +76,19 @@ def update_stocks(stocks, campaign_id, access_token):
 
 
 def update_price(prices, campaign_id, access_token):
+    """Обновляет цены товаров на Яндекс.Маркете.
+    
+    Args:
+        prices (list[dict]): Список словарей с данными о ценах товаров.
+        campaign_id (str): Идентификатор кампании продавца в Яндекс.Маркете.
+        access_token (str): API-ключ продавца.
+
+    Returns:
+        dict: Ответ API в формате JSON
+
+    Raises:
+        requests.HTTPError: В случае ошибки HTTP-запроса
+    """
     endpoint_url = "https://api.partner.market.yandex.ru/"
     headers = {
         "Content-Type": "application/json",
@@ -62,7 +105,15 @@ def update_price(prices, campaign_id, access_token):
 
 
 def get_offer_ids(campaign_id, market_token):
-    """Получить артикулы товаров Яндекс маркета"""
+    """Получает артикулы товаров Яндекс.Маркета.
+    
+    Args:
+        campaign_id (str): Идентификатор кампании продавца
+        market_token (str): Токен доступа к API Яндекс.Маркета
+
+    Returns:
+        list: Список shopSku (артикулов) товаров продавца
+    """
     page = ""
     product_list = []
     while True:
@@ -78,6 +129,19 @@ def get_offer_ids(campaign_id, market_token):
 
 
 def create_stocks(watch_remnants, offer_ids, warehouse_id):
+    """Формирует список остатков товаров для обновления в Яндекс.Маркете.
+    
+    Args:
+        watch_remnants (list): Список словарей с остатками товаров
+            - Конвертирует количество в числовой формат (">10" -> 100, "1" -> 0)
+            - Формирует запись об остатке с актуальным количеством
+        offer_ids (list): Список артикулов товаров, загруженных в Маркет
+            - Устанавливает количество 0 (отсутствие на складе)
+        warehouse_id (int): Идентификатор склада в Яндекс.Маркете
+
+    Returns:
+        list[dict]: Список для обновления остатков
+    """
     # Уберем то, что не загружено в market
     stocks = list()
     date = str(datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z")
@@ -123,6 +187,19 @@ def create_stocks(watch_remnants, offer_ids, warehouse_id):
 
 
 def create_prices(watch_remnants, offer_ids):
+    """Формирует список цен товаров в формате API Яндекс.Маркета.
+    
+    Args:
+        watch_remnants (list[dict]): Список товаров с остатками
+        offer_ids (list): Список артикулов товаров, загруженных в Маркет
+
+    Returns:
+        list[dict]: Список цен в формате Яндекс.Маркета
+        - В возвращаемых данных цена преобразуется в целое число
+    Notes:
+        - Функция использует вспомогательную функцию price_conversion() для преобразования цены
+
+    """
     prices = []
     for watch in watch_remnants:
         if str(watch.get("Код")) in offer_ids:
@@ -143,6 +220,19 @@ def create_prices(watch_remnants, offer_ids):
 
 
 async def upload_prices(watch_remnants, campaign_id, market_token):
+    """Асинхронно загружает цены товаров в Яндекс.Маркет.
+    
+    Получает список товаров кампании, формирует цены и отправляет их в API,
+    разбивая по 500 товаров.
+
+    Args:
+        watch_remnants (list): Список товаров с остатками и ценами
+        campaign_id (str): Идентификатор кампании продавца
+        market_token (str): Токен доступа к API Яндекс.Маркета
+
+    Returns:
+        list: Сформированный список всех цен для загрузки
+    """
     offer_ids = get_offer_ids(campaign_id, market_token)
     prices = create_prices(watch_remnants, offer_ids)
     for some_prices in list(divide(prices, 500)):
@@ -151,6 +241,24 @@ async def upload_prices(watch_remnants, campaign_id, market_token):
 
 
 async def upload_stocks(watch_remnants, campaign_id, market_token, warehouse_id):
+    """Асинхронно обновляет остатки товаров на складе Яндекс.Маркета.
+    
+    Получает актуальные остатки товаров и отправляет их в API,
+    разбивая по 2000 товаров.
+    Возвращает товары с ненулевым остатком и полный список всех остатков.
+    
+    Args:
+        watch_remnants (list): Список товаров с остатками и ценами
+        campaign_id (str): Идентификатор кампании продавца
+        market_token (str): Токен доступа к API Яндекс.Маркета
+        warehouse_id (int): Идентификатор склада в Яндекс.Маркете
+
+    Returns:
+        tuple: Кортеж из двух элементов:
+            - list: Товары с ненулевым остатком (count > 0)
+            - list: Все товары с остатками (включая нулевые)
+
+    """
     offer_ids = get_offer_ids(campaign_id, market_token)
     stocks = create_stocks(watch_remnants, offer_ids, warehouse_id)
     for some_stock in list(divide(stocks, 2000)):
@@ -162,6 +270,31 @@ async def upload_stocks(watch_remnants, campaign_id, market_token, warehouse_id)
 
 
 def main():
+    """Основная функция для обновления остатков и цен товаров на маркетплейсе.
+
+    Выполняет последовательное обновление данных для двух типов кампаний:
+    - FBS (Fulfillment By Seller)
+    - DBS (Delivery By Seller)
+
+    Получает текущие остатки товаров.
+
+    Использует переменые окружения:
+    - MARKET_TOKEN: Токен API Яндекс.Маркета
+    - FBS_ID: ID кампании
+    - DBS_ID: ID кампании
+    - WAREHOUSE_FBS_ID: ID склада
+    - WAREHOUSE_DBS_ID: ID склада
+
+    Для каждой кампании (FBS/DBS):
+    - Получает список товаров кампании
+    - Формирует и отправляет обновленные остатки по 2000 товаров
+    - Обновляет цены товаров
+
+     Обрабатываемые исключения:
+    - requests.exceptions.ReadTimeout: при превышении времени ожидания ответа
+    - requests.exceptions.ConnectionError: при проблемах с подключением
+    - Exception: все прочие исключения с выводом сообщения об ошибке
+    """
     env = Env()
     market_token = env.str("MARKET_TOKEN")
     campaign_fbs_id = env.str("FBS_ID")
