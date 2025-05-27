@@ -12,7 +12,28 @@ logger = logging.getLogger(__file__)
 
 
 def get_product_list(last_id, client_id, seller_token):
-    """Получить список товаров магазина озон"""
+    """Получает пагинированный список товаров через озон Seller API.
+
+    В случае ошибки HTTP поднимает исключение requests.HTTPError.
+
+    Args:
+        last_id (str): Идентификатор последнего полученного товара.
+        client_id (str): Идентификатор клиента озон.
+        seller_token (str): API-ключ продавца.
+    
+    Returns:
+        Словарь с результатом или None прри ошибке.
+    
+    Raises:
+        requests.HTTPError: Если сервер вернул код статуса HTTP >= 400.
+        
+    Examples:
+        Некорректный API-ключ:
+            >>> get_product_list("", "valid_client", "invalid_token")
+            Traceback (most recent call last):
+            ...
+            requests.HTTPError: 403 Client Error: Forbidden
+    """
     url = "https://api-seller.ozon.ru/v2/product/list"
     headers = {
         "Client-Id": client_id,
@@ -32,7 +53,18 @@ def get_product_list(last_id, client_id, seller_token):
 
 
 def get_offer_ids(client_id, seller_token):
-    """Получить артикулы товаров магазина озон"""
+    """Получает список всех артикулов товаров магазина озон.
+    
+    Использует get_product_list() для полного обхода товаров через пагинацию.
+
+    Args:
+        client_id (str): Идентификатор клиента озон.
+        seller_token (str): API-ключ продавца.
+    
+    Returns:
+        list[str]: Список артикулов товаров (offer_id).
+        Возвращает пустой список, если товаров нет или произошла ошибка.
+    """
     last_id = ""
     product_list = []
     while True:
@@ -49,7 +81,16 @@ def get_offer_ids(client_id, seller_token):
 
 
 def update_price(prices: list, client_id, seller_token):
-    """Обновить цены товаров"""
+    """Обновляет цены товаров в магазине озон.
+
+    Отправляет новые цены для одного или нескольких товаров.
+
+    Returns:
+        dict: Ответ API Ozon в формате JSON.
+    
+    Raises:
+        requests.HTTPError: Если сервер вернул код статуса HTTP >= 400.
+    """
     url = "https://api-seller.ozon.ru/v1/product/import/prices"
     headers = {
         "Client-Id": client_id,
@@ -62,7 +103,16 @@ def update_price(prices: list, client_id, seller_token):
 
 
 def update_stocks(stocks: list, client_id, seller_token):
-    """Обновить остатки"""
+    """Обновляет остатки товаров в магазине озон.
+
+    Отправляет новые остатки для одного или нескольких товаров.
+
+    Returns:
+        dict: Ответ API Ozon в формате JSON.
+    
+    Raises:
+        requests.HTTPError: Если сервер вернул код статуса HTTP >= 400.
+    """
     url = "https://api-seller.ozon.ru/v1/product/import/stocks"
     headers = {
         "Client-Id": client_id,
@@ -75,7 +125,19 @@ def update_stocks(stocks: list, client_id, seller_token):
 
 
 def download_stock():
-    """Скачать файл ostatki с сайта casio"""
+    """Скачивает файл ostatki с сайта casio.
+    
+    Скачивает zip-архив с актуальными остатками с сайта timeworld.ru.
+    Извлекает файл 'ostatki.xls' и читает данные из excel-файла.
+    Преобразует данные в список словарей.
+    Удаляет временные файлы.
+
+    Returns:
+        list[dict]: Список словарей с информацией о часах.
+    
+    Raises:
+        requests.HTTPError: Если сервер вернул код статуса HTTP >= 400.
+    """
     # Скачать остатки с сайта
     casio_url = "https://timeworld.ru/upload/files/ostatki.zip"
     session = requests.Session()
@@ -96,6 +158,40 @@ def download_stock():
 
 
 def create_stocks(watch_remnants, offer_ids):
+    """Формирует список остатков товаров для обновления озон.
+    
+    Обрабатывает данные о наличии часов из файла дистрибьютора и сопоставляет их
+    с артикулами товаров в личном кабинете озон.
+
+    Args:
+        watch_remnants (list[dict]): Список словарей с данными о наличии часов.
+            Каждый словарь должен содержать ключи:
+            - "Код": артикул товара
+            - "Количество": количество на складе
+        offer_ids (list[str]): Список артикулов товаров из озон.
+    
+    Returns:
+        list[dict]: Список словарей в формате для озон:
+            [{
+                "offer_id": "артикул товара",
+                "stock": количество (0-100)
+            }]
+    
+    Notes:
+        - Преобразует значение ">10" в 100
+        - Значение "1" преобразуется в 0
+        - Товары из offer_ids, отсутствующие в watch_remnants, добавляются с stock=0
+        - Удаляет обработанные offer_ids из входного списка
+    
+    Examples:
+        >>> remnants = [{"Код": "CASIO-123", "Количество": "5"}]
+         >>> ids = ["CASIO-123", "CASIO-456"]
+         >>> create_stocks(remnants, ids)
+         [
+            {"offer_id": "CASIO-123", "stock": 5},
+            {"offer_id": "CASIO-456", "stock": 0}
+         ]
+    """
     # Уберем то, что не загружено в seller
     stocks = []
     for watch in watch_remnants:
@@ -116,6 +212,46 @@ def create_stocks(watch_remnants, offer_ids):
 
 
 def create_prices(watch_remnants, offer_ids):
+    """Формирует список цен для обновления в озон.
+
+    Преобразует данные о ценах из файла дистрибьютора в формат,
+    необходимый для загрузки цен на озн.
+
+    Args:
+        watch_remnants (list[dict]): Список словарей с данными о наличии часов.
+            Каждый словарь должен содержать ключи:
+            - "Код": артикул товара
+            - "Количество": количество на складе
+        offer_ids (list[str]): Список артикулов товаров из озон.
+
+    Returns:
+        list[dict]: Список словарей в формате озон:
+            [{
+                "auto_action_enabled": "UNKNOWN",
+                "currency_code": "RUB",
+                "offer_id": "артикул",
+                "old_price": "0",
+                "price": "новая цена"
+            }]
+
+    Notes:
+        - Использует функцию price_conversion() для преобразования формата цены
+        - Включает только товары, присутствующие в обоих списках
+        - Устанавливает old_price="0" (без старой цены)
+        - Валюта всегда RUB
+
+    Examples:
+        >>> remnants = [{"Код": "CASIO-123", "Цена": "6'300.50 руб."}]
+        >>> ids = ["CASIO-123"]
+        >>> create_prices(remnants, ids)
+        [{
+            "auto_action_enabled": "UNKNOWN",
+            "currency_code": "RUB",
+            "offer_id": "CASIO-123",
+            "old_price": "0",
+            "price": "6300"
+        }]
+    """
     prices = []
     for watch in watch_remnants:
         if str(watch.get("Код")) in offer_ids:
@@ -131,17 +267,85 @@ def create_prices(watch_remnants, offer_ids):
 
 
 def price_conversion(price: str) -> str:
-    """Преобразовать цену. Пример: 5'990.00 руб. -> 5990"""
+    """Преобразует цену в формат для озон.
+    
+    Убирает из цены все символы, кроме цифр от 0 до 9.
+
+    Args:
+        price(str): Строка с ценой из файла дистрибьютора. Например: "5'990.00 руб."
+    
+    Returns:
+        str: Цена без лишних символов, только цифры. Например: "5990"
+    
+    Examples:
+        Пример корректного исполнения функции:
+        >>> price_conversion("13'899.99 руб.")
+        "13899"
+
+        Пример некорректного исполнения функции:
+        >>> price_conversion(6300.50)  # число вместо строки
+        Traceback (most recent call last):
+        ...
+        AttributeError: 'float' object has no attribute 'split'
+    """
     return re.sub("[^0-9]", "", price.split(".")[0])
 
 
 def divide(lst: list, n: int):
-    """Разделить список lst на части по n элементов"""
+    """Генератор, который выдаёт элементы списка lst по частям по n элементов.
+    
+    Выполняет итерацию элементов списка lst с шагом n.
+
+    Цикл for в сочетании с функцией range() позволяет получать доступ к элементам списка по их индексу. Третий аргумент функции range() определяет шаг, с которым будет двигаться цикл.
+    По умолчанию шаг равен 1.
+
+    Args:
+        lst (list): Исходный список для разделения.
+
+    Yields:
+        list: Список элементов длиной не более `n`.
+
+    Examples:
+        >>> list(divide([1, 2, 3, 4, 5], 2))
+        [[1, 2], [3, 4], [5]]
+
+        Некорректный размер:
+        >>> list(divide([1, 2, 3], 0))
+        Traceback (most recent call last):
+        ...
+        ValueError: n must be greater than 0
+    """
     for i in range(0, len(lst), n):
         yield lst[i : i + n]
 
 
 async def upload_prices(watch_remnants, client_id, seller_token):
+    """Асинхронно обновляет цены товаров в озон и возвращает результаты.
+    
+    Процесс работы:
+    - Получает список всех артикулов из озон
+    - Формирует данные для обновления цен на основе прайса дистрибьютора и актуальных артикулов магазина
+    - Обновляет цены по 1000 товаров
+    - Возвращает сформированные данные о ценах
+
+    Args:
+        watch_remnants (list[dict]): Список словарей с данными о наличии часов.
+            Каждый словарь должен содержать ключи:
+            - "Код": артикул товара
+            - "Количество": количество на складе
+        client_id (str): Идентификатор клиента озон.
+        seller_token (str): API-ключ продавца.
+
+    Returns:
+        list[dict]: Список всех сформированных цен в формате озон:
+            [{
+                "offer_id": "артикул",
+                "price": "цена",
+                "currency_code": "RUB",
+                "auto_action_enabled": "UNKNOWN",
+                "old_price": "0"
+            }]
+    """
     offer_ids = get_offer_ids(client_id, seller_token)
     prices = create_prices(watch_remnants, offer_ids)
     for some_price in list(divide(prices, 1000)):
@@ -150,6 +354,27 @@ async def upload_prices(watch_remnants, client_id, seller_token):
 
 
 async def upload_stocks(watch_remnants, client_id, seller_token):
+    """Асинхронно обновляет остатки товаров в озон и возвращает результаты.
+    
+    Процесс работы:
+    - Получает список всех артикулов из озон
+    - Формирует данные об остатках на основе файла дистрибьютора
+    - Обновляет остатки по 100 товаров
+    - Фильтрует и возвращает результаты
+
+    Args:
+        watch_remnants (list[dict]): Список словарей с данными о наличии часов.
+            Каждый словарь должен содержать ключи:
+            - "Код": артикул товара
+            - "Количество": количество на складе
+        client_id (str): Идентификатор клиента озон.
+        seller_token (str): API-ключ продавца.
+
+    Returns:
+        tuple[list[dict], list[dict]]: Кортеж из двух списков:
+            - not_empty: товары с ненулевым остатком
+            - stocks: все обновленные товары с остатками
+    """
     offer_ids = get_offer_ids(client_id, seller_token)
     stocks = create_stocks(watch_remnants, offer_ids)
     for some_stock in list(divide(stocks, 100)):
@@ -159,6 +384,25 @@ async def upload_stocks(watch_remnants, client_id, seller_token):
 
 
 def main():
+    """Основная функция для обновления остатков и цен товаров на маркетплейсе.
+
+    Функция выполняет:
+    1. Получает необходимые токены и идентификаторы из переменных окружения.
+    2. Загружает список идентификаторов товаров с маркетплейса.
+    3. Скачивает текущие данные об остатках часов.
+    4. Обновляет остатки товаров на маркетплейсе, разбивая данные по 100 товаров.
+    5. Обновляет цены товаров, разбивая данные по 1000 товаров.
+    6. Обрабатывает возможные ошибки: время ожидания, ошибки соединения и прочие ошибки.
+
+    Использует переменые окружения:
+     - SELLER_TOKEN: Токен продавца для аутентификации на API OZON
+     - CLIENT_ID: Идентификатор клиента для доступа к API
+
+     Обрабатываемые исключения:
+    - requests.exceptions.ReadTimeout: при превышении времени ожидания ответа
+    - requests.exceptions.ConnectionError: при проблемах с подключением
+    - Exception: все прочие исключения с выводом сообщения об ошибке
+    """
     env = Env()
     seller_token = env.str("SELLER_TOKEN")
     client_id = env.str("CLIENT_ID")
