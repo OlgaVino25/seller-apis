@@ -22,7 +22,12 @@ def get_product_list(last_id, client_id, seller_token):
         seller_token (str): API-ключ продавца.
     
     Returns:
-        Словарь с результатом или None прри ошибке.
+        dict: Словарь с результатом из ответа API:
+            {
+                "items": list[dict],  # Список товаров
+                "total": int,         # Всего товаров
+                "last_id": str        # Идентификатор последнего значения на странице
+            }
     
     Raises:
         requests.HTTPError: В случае ошибки HTTP-запроса
@@ -86,7 +91,7 @@ def update_price(prices: list, client_id, seller_token):
     Отправляет новые цены для одного или нескольких товаров.
 
     Returns:
-        dict: Ответ API Ozon в формате JSON.
+        dict: Словарь с ответом API после обработки запроса.
     
     Raises:
         requests.HTTPError: В случае ошибки HTTP-запроса
@@ -108,7 +113,7 @@ def update_stocks(stocks: list, client_id, seller_token):
     Отправляет новые остатки для одного или нескольких товаров.
 
     Returns:
-        dict: Ответ API Ozon в формате JSON.
+        dict: Словарь с ответом API после обработки запроса.
     
     Raises:
         requests.HTTPError: В случае ошибки HTTP-запроса
@@ -384,25 +389,6 @@ async def upload_stocks(watch_remnants, client_id, seller_token):
 
 
 def main():
-    """Основная функция для обновления остатков и цен товаров на маркетплейсе.
-
-    Функция выполняет:
-    1. Получает необходимые токены и идентификаторы из переменных окружения.
-    2. Загружает список идентификаторов товаров с маркетплейса.
-    3. Скачивает текущие данные об остатках часов.
-    4. Обновляет остатки товаров на маркетплейсе, разбивая данные по 100 товаров.
-    5. Обновляет цены товаров, разбивая данные по 1000 товаров.
-    6. Обрабатывает возможные ошибки: время ожидания, ошибки соединения и прочие ошибки.
-
-    Использует переменые окружения:
-     - SELLER_TOKEN: Токен продавца для аутентификации на API OZON
-     - CLIENT_ID: Идентификатор клиента для доступа к API
-
-     Обрабатываемые исключения:
-    - requests.exceptions.ReadTimeout: при превышении времени ожидания ответа
-    - requests.exceptions.ConnectionError: при проблемах с подключением
-    - Exception: все прочие исключения с выводом сообщения об ошибке
-    """
     env = Env()
     seller_token = env.str("SELLER_TOKEN")
     client_id = env.str("CLIENT_ID")
