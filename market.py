@@ -23,30 +23,8 @@ def get_product_list(page, campaign_id, access_token):
         access_token (str): API-ключ продавца.
     
     Returns:
-        dict: Словарь с результатом из ответа API:
-            {
-                "paging": {
-                    "nextPageToken": str,  # Токен следующей страницы
-                    "prevPageToken": str   # Токен предыдущей страницы
-                },
-                "offerMappingEntries": [
-                    {
-                        "offer": {
-                            "name": str,           # Название товара
-                            "shopSku": str,        # Ваш артикул
-                            "vendor": str,         # Производитель
-                            "barcodes": list[str], # Штрихкоды
-                            "pictures": list[str]  # Ссылки на изображения
-                        },
-                        "mapping": {
-                            "marketSku": int,     # SKU на Маркете
-                            "modelId": int        # ID модели
-                        }
-                    }
-                    # ... другие товары ...
-                ]
-            }
-    
+        (dict): Словарь с отображением предложений, содержащий информацию о товарах и их сопоставлении с Яндекс.Маркет.
+        
     Raises:
         requests.HTTPError: В случае ошибки HTTP-запроса
     """
