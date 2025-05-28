@@ -23,7 +23,29 @@ def get_product_list(page, campaign_id, access_token):
         access_token (str): API-ключ продавца.
     
     Returns:
-        Словарь с результатом или None прри ошибке.
+        dict: Словарь с результатом из ответа API:
+            {
+                "paging": {
+                    "nextPageToken": str,  # Токен следующей страницы
+                    "prevPageToken": str   # Токен предыдущей страницы
+                },
+                "offerMappingEntries": [
+                    {
+                        "offer": {
+                            "name": str,           # Название товара
+                            "shopSku": str,        # Ваш артикул
+                            "vendor": str,         # Производитель
+                            "barcodes": list[str], # Штрихкоды
+                            "pictures": list[str]  # Ссылки на изображения
+                        },
+                        "mapping": {
+                            "marketSku": int,     # SKU на Маркете
+                            "modelId": int        # ID модели
+                        }
+                    }
+                    # ... другие товары ...
+                ]
+            }
     
     Raises:
         requests.HTTPError: В случае ошибки HTTP-запроса
@@ -55,7 +77,7 @@ def update_stocks(stocks, campaign_id, access_token):
         access_token (str): API-ключ продавца.
 
     Returns:
-        dict: Ответ API в формате JSON
+        dict: Словарь с ответом API после обработки запроса.
 
     Raises:
         requests.HTTPError: В случае ошибки HTTP-запроса
@@ -84,7 +106,7 @@ def update_price(prices, campaign_id, access_token):
         access_token (str): API-ключ продавца.
 
     Returns:
-        dict: Ответ API в формате JSON
+        dict: Словарь с ответом API после обработки запроса.
 
     Raises:
         requests.HTTPError: В случае ошибки HTTP-запроса
@@ -137,7 +159,7 @@ def create_stocks(watch_remnants, offer_ids, warehouse_id):
             - Формирует запись об остатке с актуальным количеством
         offer_ids (list): Список артикулов товаров, загруженных в Маркет
             - Устанавливает количество 0 (отсутствие на складе)
-        warehouse_id (int): Идентификатор склада в Яндекс.Маркете
+        warehouse_id (str): Идентификатор склада в Яндекс.Маркете
 
     Returns:
         list[dict]: Список для обновления остатков
@@ -251,7 +273,7 @@ async def upload_stocks(watch_remnants, campaign_id, market_token, warehouse_id)
         watch_remnants (list): Список товаров с остатками и ценами
         campaign_id (str): Идентификатор кампании продавца
         market_token (str): Токен доступа к API Яндекс.Маркета
-        warehouse_id (int): Идентификатор склада в Яндекс.Маркете
+        warehouse_id (str): Идентификатор склада в Яндекс.Маркете
 
     Returns:
         tuple: Кортеж из двух элементов:
@@ -270,31 +292,6 @@ async def upload_stocks(watch_remnants, campaign_id, market_token, warehouse_id)
 
 
 def main():
-    """Основная функция для обновления остатков и цен товаров на маркетплейсе.
-
-    Выполняет последовательное обновление данных для двух типов кампаний:
-    - FBS (Fulfillment By Seller)
-    - DBS (Delivery By Seller)
-
-    Получает текущие остатки товаров.
-
-    Использует переменые окружения:
-    - MARKET_TOKEN: Токен API Яндекс.Маркета
-    - FBS_ID: ID кампании
-    - DBS_ID: ID кампании
-    - WAREHOUSE_FBS_ID: ID склада
-    - WAREHOUSE_DBS_ID: ID склада
-
-    Для каждой кампании (FBS/DBS):
-    - Получает список товаров кампании
-    - Формирует и отправляет обновленные остатки по 2000 товаров
-    - Обновляет цены товаров
-
-     Обрабатываемые исключения:
-    - requests.exceptions.ReadTimeout: при превышении времени ожидания ответа
-    - requests.exceptions.ConnectionError: при проблемах с подключением
-    - Exception: все прочие исключения с выводом сообщения об ошибке
-    """
     env = Env()
     market_token = env.str("MARKET_TOKEN")
     campaign_fbs_id = env.str("FBS_ID")
