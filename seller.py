@@ -22,13 +22,8 @@ def get_product_list(last_id, client_id, seller_token):
         seller_token (str): API-ключ продавца.
     
     Returns:
-        dict: Словарь с результатом из ответа API:
-            {
-                "items": list[dict],  # Список товаров
-                "total": int,         # Всего товаров
-                "last_id": str        # Идентификатор последнего значения на странице
-            }
-    
+        (dict): Список цен в формате Озон, содержащий информацию об артикулах и ценах товаров.
+            
     Raises:
         requests.HTTPError: В случае ошибки HTTP-запроса
     
